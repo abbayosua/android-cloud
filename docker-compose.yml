@@ -18,11 +18,12 @@ services:
       - androidboot.redroid_dpi=${ANDROID_CLOUD_DPI:-320}
     networks:
       - android-cloud-net
+    restart: unless-stopped
 
   ws-scrcpy:
     image: scavin/ws-scrcpy:latest
     ports:
-      - "8233:8000"
+      - "8000"
     restart: unless-stopped
     depends_on:
       - redroid
@@ -32,8 +33,25 @@ services:
     command:
       - |
         until adb connect redroid:5555 2>/dev/null; do sleep 2; done
-        echo "[OK] Connected to redroid"
+        echo "[OK] ws-scrcpy connected to redroid"
         npm start
+
+  panel:
+    build:
+      context: ./panel
+      dockerfile: Dockerfile
+    image: android-cloud/panel
+    ports:
+      - "${ANDROID_CLOUD_PANEL_PORT:-8233}:8233"
+    environment:
+      - ADB_HOST=redroid
+      - PORT=8233
+    depends_on:
+      - redroid
+      - ws-scrcpy
+    networks:
+      - android-cloud-net
+    restart: unless-stopped
 
 networks:
   android-cloud-net:

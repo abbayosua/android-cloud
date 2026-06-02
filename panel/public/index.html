@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Android-Cloud</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="toolbar">
+  <div class="tb-left">
+    <span class="logo">🤖 Android-Cloud</span>
+    <span class="sep">|</span>
+    <button class="tb-btn active" data-tab="screen" title="Screen">🖥️ Screen</button>
+    <button class="tb-btn" data-tab="apps" title="Apps">📦 Apps</button>
+    <button class="tb-btn" data-tab="install" title="Install APK">📥 Install</button>
+    <button class="tb-btn" data-tab="files" title="Files">📁 Files</button>
+    <button class="tb-btn" data-tab="info" title="Device Info">ℹ️ Info</button>
+  </div>
+  <div class="tb-right">
+    <span id="status-dot" class="status-dot"></span>
+    <span id="status-text" class="status-text">connecting...</span>
+  </div>
+</div>
+
+<div id="main">
+  <div id="tab-screen" class="tab active">
+    <iframe id="screen-frame" src="/screen/"></iframe>
+  </div>
+
+  <div id="tab-apps" class="tab">
+    <div class="tab-header">
+      <h2>Installed Apps</h2>
+      <button id="refresh-apps" class="btn-sm">🔄 Refresh</button>
+    </div>
+    <div id="apps-grid" class="apps-grid"></div>
+  </div>
+
+  <div id="tab-install" class="tab">
+    <h2>Install APK</h2>
+    <div id="drop-zone" class="drop-zone">
+      <div class="drop-text">📥 Drop APK file here</div>
+      <div class="drop-sub">or click to browse</div>
+      <input type="file" id="file-input" accept=".apk" hidden>
+    </div>
+    <div id="apk-url-section">
+      <h3>Or install from URL</h3>
+      <div class="url-row">
+        <input type="text" id="apk-url" placeholder="https://example.com/app.apk">
+        <button id="install-url-btn" class="btn-sm">Install</button>
+      </div>
+      <div class="quick-apks" id="quick-apks">
+        <button class="chip" data-url="https://res.viayoo.com/v1/via-release.apk">📦 Via Browser</button>
+      </div>
+    </div>
+    <div id="install-log" class="log-box"></div>
+  </div>
+
+  <div id="tab-files" class="tab">
+    <h2>Upload File</h2>
+    <div id="file-drop-zone" class="drop-zone">
+      <div class="drop-text">📁 Drop file to upload to Android</div>
+      <div class="drop-sub">or click to browse</div>
+      <input type="file" id="file-input-upload" hidden>
+    </div>
+    <div id="upload-log" class="log-box"></div>
+  </div>
+
+  <div id="tab-info" class="tab">
+    <h2>Device Info</h2>
+    <div id="info-content" class="info-grid"></div>
+    <div class="info-actions">
+      <button id="refresh-info" class="btn-sm">🔄 Refresh</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

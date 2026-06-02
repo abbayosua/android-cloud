@@ -47,13 +47,49 @@ cmd_start() {
     mkdir -p "$HOME/android-cloud-data"
 
     echo "[...] Starting containers..."
+
     cd "$SCRIPT_DIR"
     docker compose up -d
 
     echo ""
+    echo "[...] Waiting for redroid boot..."
+    local port="${ANDROID_CLOUD_PORT:-5555}"
+    adb connect "localhost:$port" 2>/dev/null || true
+
+    local booted=false
+    for i in $(seq 1 60); do
+        boot=$(adb -s "localhost:$port" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r\n')
+        if [ "$boot" = "1" ]; then
+            echo "[OK] Android boot completed"
+            booted=true
+            break
+        fi
+        sleep 5
+    done
+
+    if [ "$booted" = true ]; then
+        echo "[...] Optimizing Android (disabling SystemUI + Launcher)..."
+        adb -s "localhost:$port" shell pm disable-user com.android.systemui 2>/dev/null || true
+        adb -s "localhost:$port" shell pm disable-user com.android.launcher3 2>/dev/null || true
+        adb -s "localhost:$port" shell pm disable-user com.android.launcher 2>/dev/null || true
+        echo "[OK] SystemUI + Launcher disabled (saves ~850 MB RAM)"
+
+        echo "[...] Installing Via Browser..."
+        local via_apk="/tmp/via-release.apk"
+        if [ ! -f "$via_apk" ]; then
+            curl -sL -o "$via_apk" "https://res.viayoo.com/v1/via-release.apk" 2>/dev/null || true
+        fi
+        if [ -f "$via_apk" ]; then
+            adb -s "localhost:$port" install -r "$via_apk" 2>/dev/null && echo "[OK] Via Browser installed" || echo "[SKIP] Via install failed"
+        fi
+    else
+        echo "[WARN] Boot not completed within timeout, skipping optimization"
+    fi
+
+    echo ""
     echo "  ── Services ──"
-    echo "  Redroid ADB:  adb connect localhost:${ANDROID_CLOUD_PORT:-5555}"
     echo "  Web Panel:    http://localhost:8233"
+    echo "  ADB:          adb connect localhost:${ANDROID_CLOUD_PORT:-5555}"
     echo ""
 
     bash "$SCRIPT_DIR/scripts/tunnel.sh" "$TUNNEL_METHOD"

@@ -18,9 +18,12 @@
 ## ✨ Fitur
 
 | Fitur | Detail |
-|---|---|
+|---|---|---|
 | **Android 12** | Full Android di container Docker |
-| **Web Panel** | Akses via browser — sentuh, keyboard, clipboard |
+| **Web Panel** | Akses via browser — sentuh, keyboard, clipboard, APK install, file manager |
+| **Auto Hemat RAM** | SystemUI + Launcher auto disable (hemat ~850 MB) |
+| **Via Browser** | Pre-installed, bisa buka link dari panel |
+| **APK Sideload** | Drag & drop APK lewat browser langsung install |
 | **ADB** | `adb connect` untuk power user |
 | **Internet Tunnel** | Cloudflare atau localhost.run — URL public langsung |
 | **Satu Command** | `git clone && bash run.sh` — selesai |
@@ -51,19 +54,28 @@ Dapet URL kayak `https://xxx.trycloudflare.com` — buka di browser, langsung li
 ## 📸 Screenshot
 
 ```
-┌──────────────────────────────────────────┐
-│                                          │
-│    ┌──────────────────────────────┐      │
-│    │                              │      │
-│    │     Android 12               │      │
-│    │     Running in Docker        │      │
-│    │                              │      │
-│    └──────────────────────────────┘      │
-│                                          │
-│    Browser ← WebSocket ← ws-scrcpy       │
-│                      ← ADB ← redroid     │
-│                                          │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  🖥️ Screen  📦 Apps  📥 Install  📁 Files  ℹ️  │ ← Panel UI
+├──────────────────────────────────────────────────┤
+│  ┌──────────────────────────────────────────┐    │
+│  │                                          │    │
+│  │     Android 12 (no SystemUI/Launcher)    │    │
+│  │     ~950 MB RAM instead of 1.8 GB        │    │
+│  │                                          │    │
+│  └──────────────────────────────────────────┘    │
+│          ↕ ADB TCP                              │
+│  ┌──────────────────────────────────────────┐    │
+│  │  ws-scrcpy (screen stream via WebSocket)  │    │
+│  └──────────────────────────────────────────┘    │
+│          ↕ HTTP proxy                            │
+│  ┌──────────────────────────────────────────┐    │
+│  │  Panel Server (Express + REST API)       │    │
+│  │  /api/adb/install → adb install .apk     │    │
+│  │  /api/adb/apps    → list packages        │    │
+│  │  /api/adb/launch  → start app            │    │
+│  │  /api/adb/info    → device info          │    │
+│  └──────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────┘
 ```
 
 <br>
@@ -72,7 +84,7 @@ Dapet URL kayak `https://xxx.trycloudflare.com` — buka di browser, langsung li
 
 | Command | Fungsi |
 |---------|--------|
-| `sudo bash run.sh` | Install + start + tunnel prompt |
+| `sudo bash run.sh` | Install + start + auto init (disable UI + install Via) + tunnel |
 | `sudo bash run.sh start cloudflare` | Start pake Cloudflare tunnel |
 | `sudo bash run.sh start localhost` | Start pake localhost.run |
 | `sudo bash run.sh stop` | Stop semua container |
@@ -139,12 +151,15 @@ https://acak.localhost.run
 
 ### Pemakaian Resource
 
-| Service | RAM |
-|---------|-----|
-| redroid | ~1.5 GB |
-| ws-scrcpy | ~28 MB |
-| Docker overhead | ~100 MB |
-| **Total** | **~1.7 GB** |
+| Service | RAM (sebelum) | RAM (sesudah optimasi) |
+|---------|:------------:|:----------------------:|
+| redroid | ~1.8 GB | **~950 MB** |
+| ws-scrcpy | ~28 MB | ~28 MB |
+| panel | — | ~35 MB |
+| Docker overhead | ~140 MB | ~140 MB |
+| **Total** | **~2.0 GB** | **~1.15 GB** |
+
+> Hemat ~850 MB dengan disable SystemUI (+460 MB) dan Launcher3 (+390 MB).
 
 <br>
 
@@ -154,13 +169,22 @@ https://acak.localhost.run
 android-cloud/
 ├── run.sh                    # Main — cukup jalanin ini
 ├── docker-compose.yml        # Orchestrator container
+├── panel/
+│   ├── Dockerfile             # Panel server image
+│   ├── package.json
+│   ├── server.js              # Express + proxy ws-scrcpy + REST API
+│   └── public/
+│       ├── index.html         # Panel UI (toolbar + tabs)
+│       ├── style.css
+│       └── app.js             # Frontend logic
 ├── scripts/
 │   ├── install.sh            # Install docker, kernel modules, dll
-│   └── tunnel.sh             # Cloudflare & localhost.run manager
+│   ├── tunnel.sh             # Cloudflare & localhost.run manager
+│   └── redroid-init.sh       # Script untuk disable SystemUI/Launcher
 ├── udev/
 │   └── 99-android-cloud.rules  # Biar binder device permission otomatis
 ├── assets/
-│   └── icon.png              # Logo
+│   └── icon.svg              # Logo
 └── README.md
 ```
 
@@ -178,16 +202,23 @@ Browser Anda
 └─────────┬───────────┘
           │ HTTP :8233
           ▼
-┌─────────────────────┐
-│  ws-scrcpy           │  ← Web panel (streaming H.264 + input)
-│  (Node.js)           │
-└─────────┬───────────┘
-          │ ADB TCP :5555
-          ▼
-┌─────────────────────┐
-│  redroid             │  ← Android 12 container
-│  (Android 12)        │
-└─────────────────────┘
+┌──────────────────────────────────┐
+│  Panel Server (Express)          │
+│  ┌─ / → index.html (UI)        │
+│  ├─ /screen/* → proxy ws-scrcpy│
+│  ├─ /api/adb/install           │
+│  ├─ /api/adb/apps              │
+│  ├─ /api/adb/launch            │
+│  └─ /api/adb/info              │
+└────────┬───────────────────────┘
+         │ HTTP :8000         │ ADB TCP :5555
+         ▼                    ▼
+┌──────────────┐    ┌──────────────────┐
+│  ws-scrcpy    │    │  redroid          │
+│  (H.264 via  │    │  (Android 12,     │
+│   WebSocket)  │    │   no SystemUI,    │
+│              │    │   no Launcher)    │
+└──────────────┘    └──────────────────┘
 ```
 
 <br>
