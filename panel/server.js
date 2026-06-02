@@ -1,5 +1,7 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
+const http = require('http');
+const httpProxy = require('http-proxy');
 const multer = require('multer');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -167,7 +169,14 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[panel] Android-Cloud Panel running on port ${PORT}`);
   console.log(`[panel] Proxying ws-scrcpy at /screen`);
+});
+
+// Proxy ALL WebSocket upgrades to ws-scrcpy (not just /screen)
+// ws-scrcpy connects to root path / using location.host
+const wsProxy = httpProxy.createProxyServer({ target: 'http://ws-scrcpy:8000', ws: true });
+server.on('upgrade', (req, socket, head) => {
+  wsProxy.ws(req, socket, head);
 });

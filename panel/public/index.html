@@ -78,6 +78,11 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<script>
+if (location.hash.startsWith('#!')) {
+  location.replace('/screen/' + location.hash);
+}
+</script>
 <script src="app.js"></script>
 </body>
 </html>
