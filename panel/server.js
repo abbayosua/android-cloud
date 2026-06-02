@@ -1,6 +1,5 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const http = require('http');
 const { WebSocket: WebSocketClient } = require('ws');
 const multer = require('multer');
 const path = require('path');
