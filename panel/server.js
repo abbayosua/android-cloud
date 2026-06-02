@@ -1,7 +1,7 @@
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const http = require('http');
-const httpProxy = require('http-proxy');
+const { WebSocket: WebSocketClient } = require('ws');
 const multer = require('multer');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -174,9 +174,27 @@ const server = app.listen(PORT, () => {
   console.log(`[panel] Proxying ws-scrcpy at /screen`);
 });
 
-// Proxy ALL WebSocket upgrades to ws-scrcpy (not just /screen)
-// ws-scrcpy connects to root path / using location.host
-const wsProxy = httpProxy.createProxyServer({ target: 'http://ws-scrcpy:8000', ws: true });
+// Proxy ALL WebSocket upgrades to ws-scrcpy using ws library
+// (http-proxy corrupts WebSocket frames with RSV1 flag)
+const { WebSocketServer } = require('ws');
+const wss = new WebSocketServer({ noServer: true });
+
 server.on('upgrade', (req, socket, head) => {
-  wsProxy.ws(req, socket, head);
+  const url = new URL(req.url, 'http://localhost');
+  const target = url.pathname + url.search;
+
+  wss.handleUpgrade(req, socket, head, (clientWs) => {
+    const serverWs = new WebSocketClient(`ws://ws-scrcpy:8000${target}`);
+
+    serverWs.on('open', () => {
+      clientWs.on('message', data => serverWs.send(data));
+      serverWs.on('message', data => clientWs.send(data));
+      clientWs.on('close', () => serverWs.close());
+      serverWs.on('close', () => clientWs.close());
+      clientWs.on('error', () => serverWs.close());
+      serverWs.on('error', () => clientWs.close());
+    });
+
+    serverWs.on('error', () => clientWs.close());
+  });
 });
